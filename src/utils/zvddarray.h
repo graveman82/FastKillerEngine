@@ -70,20 +70,62 @@ public:
 
     ZvdcDArray() noexcept = default;
 
-    explicit ZvdcDArray(size_type nInitialCount);
-    ZvdcDArray(size_type nInitialCount, const T& value);
-
     ~ZvdcDArray()
     {
         clear(); 
         GetAllocator()->deallocate(m_pData, m_nCapacity);
     }
 
-    ZvdcDArray(const ZvdcDArray& other);
-    ZvdcDArray& operator=(const ZvdcDArray& other);
-    ZvdcDArray(ZvdcDArray&& other) noexcept;
-    ZvdcDArray& operator=(ZvdcDArray&& other) noexcept;
+    ZvdcDArray(const ZvdcDArray& other)
+    {
+        try
+        {
+            clear_and_reserve(other.size());
+        }
+        catch (const std::bad_alloc&)
+        {
+            throw;
+        }
 
+        if constexpr (std::is_trivially_copyable_v<T>)
+        {
+            std::memcpy(m_pData, other.data(), other.size() * sizeof(T));
+        }
+        else
+        {
+            std::uninitialized_copy_n(other.data(), other.size(), m_pData);
+        }
+        m_nCount = other.size();
+    }
+
+    ZvdcDArray& operator=(const ZvdcDArray& other)
+    {
+        if (this == &other)
+        {
+            return *this;
+        }
+
+        try
+        {
+            clear_and_reserve(other.size());
+        }
+        catch (const std::bad_alloc&)
+        {
+            throw;
+        }
+
+        if constexpr (std::is_trivially_copyable_v<T>)
+        {
+            std::memcpy(m_pData, other.data(), other.size() * sizeof(T));
+        }
+        else
+        {
+            std::uninitialized_copy_n(other.data(), other.size(), m_pData);
+        }
+        m_nCount = other.size();
+
+        return *this;
+    }
 
     void push_back(const T& val)
     {
@@ -104,13 +146,69 @@ public:
         }
     }
 
-    size_type push_back_unique(const T& val);
-    void pop_back();
+    void pop_back()
+    {
+        ZVD_ASSERT(!empty(), "pop_back() called on empty array");
+        --m_nCount;
 
- 
-    iterator erase(const_iterator pos);
+        if constexpr (!std::is_trivially_destructible_v<T>)
+        {
+            std::destroy_at(m_pData + m_nCount);
+        }
+    }
 
-    void clear() noexcept;
+    iterator erase(const_iterator pos)
+    {
+        ZVD_ASSERT(pos >= begin() && pos < end(), "erase() iterator out of bounds");
+
+        iterator it = begin() + (pos - begin());
+
+        if constexpr (std::is_trivially_copyable_v<T>)
+        {
+            std::memmove(it, it + 1, (end() - (it + 1)) * sizeof(T));
+        }
+        else
+        {
+            std::move(it + 1, end(), it);
+
+            std::destroy_at(end() - 1);
+        }
+
+        --m_nCount;
+        
+        return it;
+    }
+
+    void clear() noexcept
+    {
+        if constexpr (!std::is_trivially_destructible_v<T>)
+        {
+            std::destroy_n(m_pData, m_nCount);
+        }
+
+        // Reset the size counter. Capacity remains.
+        m_nCount = 0;
+    }
+
+    void clear_and_reserve(size_type nNewCapacity)
+    {
+        clear();
+
+        if (nNewCapacity > m_nCapacity)
+        {
+            allocator_type* pAllocator = GetAllocator();
+
+            // Let's assume reallocate might throw bad_alloc.
+            T* pNewData = pAllocator->reallocate(m_pData, nNewCapacity);
+            if (!pNewData && nNewCapacity > 0)
+            {
+                throw std::bad_alloc();
+            }
+
+            m_pData = pNewData;
+            m_nCapacity = nNewCapacity;
+        }
+    }
 
    
     size_type size() const noexcept { return m_nCount; }
