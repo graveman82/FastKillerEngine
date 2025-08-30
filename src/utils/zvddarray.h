@@ -87,21 +87,22 @@ public:
 
     void push_back(const T& val)
     {
-        size_type nNewCount = m_nCount + 1;
-        if (nNewCount <= m_nCapacity)
+        if constexpr (std::is_trivially_copyable_v<T>)
         {
-            PushBackInPlace(val);
+            PushBackPOD(val);
         }
         else
         {
-            PushBackReallocate(val);
+            if (m_nCount < m_nCapacity)
+            {
+                PushBackInPlace(val);
+            }
+            else
+            {
+                PushBackReallocate(val);
+            }
         }
     }
-
-    void push_back(T&& value);
-
-    template<typename... TArgs>
-    T& emplace_back(TArgs&&... args);
 
     size_type push_back_unique(const T& val);
     void pop_back();
@@ -110,9 +111,6 @@ public:
     iterator erase(const_iterator pos);
 
     void clear() noexcept;
-
-    void reserve(size_type nNewCapacity);
-    void resize(size_type nNewCount);
 
    
     size_type size() const noexcept { return m_nCount; }
@@ -202,7 +200,11 @@ private:
 
     void PushBackInPlace(const T& val)
     {
+        ZVD_ASSERT(m_nCount < m_nCapacity, "PushBackInPlace called with no capacity left");
 
+        std::construct_at(std::addressof(m_pData[m_nCount]), val);
+
+        ++m_nCount;
     }
 
     void PushBackReallocate(const T& val)
@@ -270,6 +272,32 @@ private:
         m_nCapacity = nNewCapacity;
         ++m_nCount;
     }
+
+    void PushBackPOD(const T& val)
+    {
+        if (m_nCount >= m_nCapacity)
+        {
+            allocator_type* pAllocator = GetAllocator();
+            ZVD_ASSERT(pAllocator);
+            const size_type nNewCapacity = pAllocator->GetNewCapacity(m_nCount + 1, m_nCapacity);
+
+            if (nNewCapacity > max_size()) {
+                throw std::length_error("ZvdcDArray reallocation exceeds max_size()");
+            }
+            
+            T* pNewData = pAllocator->reallocate(m_pData, nNewCapacity);
+
+            if (!pNewData) {
+                throw std::bad_alloc();
+            }
+
+            m_pData = pNewData;
+            m_nCapacity = nNewCapacity;
+        }
+
+        memcpy(std::addressof(m_pData[m_nCount++]), std::addressof(val), sizeof(T));
+    }
+
 private:
     T* m_pData{};
     size_type   m_nCount{};
