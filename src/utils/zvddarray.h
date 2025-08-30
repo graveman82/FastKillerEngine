@@ -68,10 +68,16 @@ public:
     using iterator = T*;
     using const_iterator = const T*;
 
-    ZvdcDArray() noexcept;
+    ZvdcDArray() noexcept = default;
+
     explicit ZvdcDArray(size_type nInitialCount);
     ZvdcDArray(size_type nInitialCount, const T& value);
-    ~ZvdcDArray();
+
+    ~ZvdcDArray()
+    {
+        clear(); 
+        GetAllocator()->deallocate(m_pData, m_nCapacity);
+    }
 
     ZvdcDArray(const ZvdcDArray& other);
     ZvdcDArray& operator=(const ZvdcDArray& other);
@@ -108,29 +114,78 @@ public:
     void reserve(size_type nNewCapacity);
     void resize(size_type nNewCount);
 
-    size_type size() const noexcept;
-    size_type capacity() const noexcept;
-    bool empty() const noexcept;
-    size_type max_size() const noexcept;
+   
+    size_type size() const noexcept { return m_nCount; }
+    size_type capacity() const noexcept { return m_nCapacity; }
+    bool empty() const noexcept { return m_nCount == 0; }
 
-    T& operator[](size_type iIndex);
-    const T& operator[](size_type iIndex) const;
-    T& at(size_type iIndex);
-    const T& at(size_type iIndex) const;
+    size_type max_size() const noexcept
+    {
+        // A theoretical maximum based on size_t and element size.
+        return std::numeric_limits<size_type>::max() / sizeof(value_type);
+    }
 
-    T& front();
-    const T& front() const;
-    T& back();
-    const T& back() const;
+    T& operator[](size_type nIndex)
+    {
+        ZVD_ASSERT(nIndex < m_nCount, "Index out of bounds");
+        return m_pData[nIndex];
+    }
 
-    T* data() noexcept;
-    const T* data() const noexcept;
+    const T& operator[](size_type nIndex) const
+    {
+        ZVD_ASSERT(nIndex < m_nCount, "Index out of bounds");
+        return m_pData[nIndex];
+    }
 
-    iterator begin() noexcept;
-    iterator end() noexcept;
-    const_iterator begin() const noexcept;
-    const_iterator end() const noexcept;
+    T& at(size_type nIndex)
+    {
+        if (nIndex >= m_nCount)
+        {
+            throw std::out_of_range("ZvdcDArray::at index out of bounds");
+        }
+        return m_pData[nIndex];
+    }
 
+    const T& at(size_type nIndex) const
+    {
+        if (nIndex >= m_nCount)
+        {
+            throw std::out_of_range("ZvdcDArray::at index out of bounds");
+        }
+        return m_pData[nIndex];
+    }
+
+    T& front()
+    {
+        ZVD_ASSERT(!empty(), "front() called on empty array");
+        return m_pData[0];
+    }
+
+    const T& front() const
+    {
+        ZVD_ASSERT(!empty(), "front() called on empty array");
+        return m_pData[0];
+    }
+
+    T& back()
+    {
+        ZVD_ASSERT(!empty(), "back() called on empty array");
+        return m_pData[m_nCount - 1];
+    }
+
+    const T& back() const
+    {
+        ZVD_ASSERT(!empty(), "back() called on empty array");
+        return m_pData[m_nCount - 1];
+    }
+
+    T* data() noexcept { return m_pData; }
+    const T* data() const noexcept { return m_pData; }
+
+    iterator begin() noexcept { return m_pData; }
+    iterator end() noexcept { return m_pData + m_nCount; }
+    const_iterator begin() const noexcept { return m_pData; }
+    const_iterator end() const noexcept { return m_pData + m_nCount; }
 private:
     //-------------------------------------------------------------------------
     // Implementation Helpers
