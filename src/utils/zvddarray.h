@@ -190,7 +190,15 @@ private:
     //-------------------------------------------------------------------------
     // Implementation Helpers
     //-------------------------------------------------------------------------
-    TAllocator* GetAllocator();
+    TAllocator* GetAllocator()
+    {
+        if (TAllocator::CanBeCreatedOnStack()) {
+            static ZvdByte allocatorMem[TAllocator::GetInstanceSize()];
+            return TAllocator::CreateOnStack(allocatorMem);
+
+        }
+        return nullptr;
+    }
 
     void PushBackInPlace(const T& val)
     {
@@ -199,7 +207,68 @@ private:
 
     void PushBackReallocate(const T& val)
     {
-        
+        allocator_type* pAllocator = GetAllocator();
+        ZVD_ASSERT(pAllocator);
+        const size_type nNewCapacity = pAllocator->GetNewCapacity(m_nCount + 1, m_nCapacity);
+
+        if (nNewCapacity > max_size()) {
+            throw std::length_error("ZvdcDArray reallocation exceeds max_size()");
+        }
+
+        T* pNewData{};
+
+        try
+        {
+            pNewData = pAllocator->allocate(nNewCapacity);
+        }
+        catch (const std::bad_alloc&)
+        {
+            throw;
+        }
+
+        size_type nConstructedCount{};
+        try
+        {
+            if constexpr (std::is_nothrow_move_constructible_v<T>)
+            {
+                for (; nConstructedCount < m_nCount; ++nConstructedCount)
+                {
+                    std::construct_at(
+                        std::addressof(pNewData[nConstructedCount]),
+                        std::move(m_pData[nConstructedCount])
+                    );
+                }
+            }
+            else
+            {
+                for (; nConstructedCount < m_nCount; ++nConstructedCount)
+                {
+                    std::construct_at(
+                        std::addressof(pNewData[nConstructedCount]),
+                        m_pData[nConstructedCount]
+                    );
+                }
+            }
+
+            std::construct_at(std::addressof(pNewData[m_nCount]), val);
+            ++nConstructedCount;
+        }
+        catch (...)
+        {
+            std::destroy_n(pNewData, nConstructedCount);
+            pAllocator->deallocate(pNewData, nNewCapacity);
+            throw;
+        }
+
+        if (m_pData)
+        {
+            std::destroy_n(m_pData, m_nCount);
+            pAllocator->deallocate(m_pData, m_nCapacity);
+        }
+
+        m_pData = pNewData;
+        m_nCapacity = nNewCapacity;
+        ++m_nCount;
     }
 private:
     T* m_pData{};
