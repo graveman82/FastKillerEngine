@@ -47,6 +47,7 @@ Purpose: blank file for headers.
 
 #include "zvdtypes.h" 
 #include <cstdarg>   // Для variadic functions
+#include <intrin.h>
 
 //-----------------------------------------------------------------------------
 // Определяем, находимся ли мы в режиме отладки
@@ -62,7 +63,7 @@ Purpose: blank file for headers.
 //-----------------------------------------------------------------------------
 #ifdef ZVD_DEBUG
 #if defined(_MSC_VER)
-#define ZVD_DEBUG_BP() do { __asm int 3; } while(0)
+#define ZVD_DEBUG_BP() __debugbreak()
 #elif defined(__GNUC__)
 #define ZVD_DEBUG_BP() do { __asm__ ("int $3\n\t"); } while(0)
 #else
