@@ -290,7 +290,7 @@ private:
     {
         if (TAllocator::CanBeCreatedOnStack()) {
             static ZvdByte allocatorMem[TAllocator::GetInstanceSize()];
-            return TAllocator::CreateOnStack(allocatorMem);
+            return TAllocator::CreateOnStack(allocatorMem, TAllocator::GetInstanceSize());
 
         }
         return nullptr;
@@ -308,7 +308,7 @@ private:
     void PushBackReallocate(const T& val)
     {
         allocator_type* pAllocator = GetAllocator();
-        ZVD_ASSERT(pAllocator);
+        ZVD_ASSERT(pAllocator, "");
         const size_type nNewCapacity = pAllocator->GetNewCapacity(m_nCount + 1, m_nCapacity);
 
         if (nNewCapacity > max_size()) {
@@ -376,7 +376,7 @@ private:
         if (m_nCount >= m_nCapacity)
         {
             allocator_type* pAllocator = GetAllocator();
-            ZVD_ASSERT(pAllocator);
+            ZVD_ASSERT(pAllocator, "");
             const size_type nNewCapacity = pAllocator->GetNewCapacity(m_nCount + 1, m_nCapacity);
 
             if (nNewCapacity > max_size()) {
