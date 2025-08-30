@@ -45,8 +45,8 @@ Purpose: blank file for headers.
 */
 #pragma once
 
-#if __cplusplus < 201703L
-#error "ZVD Engine requires a C++17 compliant compiler or newer!"
+#if __cplusplus < 202002L
+#error "Zv3d engine requires a C++20 compliant compiler or newer!"
 #endif
 
 #include <utility>
@@ -70,6 +70,7 @@ using ZvdByte = uint8_t;
 using ZvdReal32 = float;
 using ZvdReal64 = double;
 
+constexpr size_t kZVD_INVALID_INDEX = std::numeric_limits<size_t>::max();
 //-----------------------------------------------------------------------------
 //
 // Строки и символы
